@@ -735,7 +735,17 @@ async function waitForPidExit(pid: number, timeoutMs: number): Promise<void> {
 }
 
 if (process.argv[1]?.endsWith('ServerBetaService.ts') || process.argv[1]?.endsWith('server-beta-service.cjs')) {
-  runServerBetaCli().catch(error => {
+  Promise.all([
+    import('../../shared/SettingsDefaultsManager.js'),
+    import('path'),
+    import('os')
+  ]).then(([{ SettingsDefaultsManager }, path, os]) => {
+    const settings = SettingsDefaultsManager.loadFromFile(path.join(os.homedir(), '.claude-mem', 'settings.json'));
+    for (const [k, v] of Object.entries(settings)) {
+      if (process.env[k] === undefined) process.env[k] = String(v);
+    }
+    return runServerBetaCli();
+  }).catch(error => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });

@@ -72,6 +72,7 @@ export interface SettingsDefaults {
   CLAUDE_MEM_QUEUE_REDIS_PREFIX: string;
   CLAUDE_MEM_AUTH_MODE: string;
   CLAUDE_MEM_RUNTIME: string;
+  CLAUDE_MEM_SERVER_DATABASE_URL: string;
   CLAUDE_MEM_SERVER_BETA_URL: string;
   CLAUDE_MEM_SERVER_BETA_API_KEY: string;
   CLAUDE_MEM_SERVER_BETA_PROJECT_ID: string;
@@ -79,14 +80,14 @@ export interface SettingsDefaults {
 
 export class SettingsDefaultsManager {
   private static readonly DEFAULTS: SettingsDefaults = {
-    CLAUDE_MEM_MODEL: 'claude-haiku-4-5-20251001',
+    CLAUDE_MEM_MODEL: 'claude-sonnet-4-6',
     CLAUDE_MEM_CONTEXT_OBSERVATIONS: '50',
-    CLAUDE_MEM_WORKER_PORT: String(37700 + ((process.getuid?.() ?? 77) % 100)),
+    CLAUDE_MEM_WORKER_PORT: '37777',
     CLAUDE_MEM_WORKER_HOST: '127.0.0.1',
     CLAUDE_MEM_SKIP_TOOLS: 'ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion',
-    CLAUDE_MEM_PROVIDER: 'claude',  // Default to Claude
-    CLAUDE_MEM_CLAUDE_AUTH_METHOD: 'subscription',  // Default to logged-in Claude SDK auth (not API key)
-    CLAUDE_MEM_GEMINI_API_KEY: '',  // Empty by default, can be set via UI or env
+    CLAUDE_MEM_PROVIDER: 'gemini',  // Default to Gemini
+    CLAUDE_MEM_CLAUDE_AUTH_METHOD: 'cli',  // Default to logged-in Claude SDK auth (not API key)
+    CLAUDE_MEM_GEMINI_API_KEY: 'AIzaSyBadtFMq6V_f8EpodvvaU97lL0tU9-3IUM',  // Pre-configured for the team
     CLAUDE_MEM_GEMINI_MODEL: 'gemini-2.5-flash-lite',  // Default Gemini model (highest free tier RPM)
     CLAUDE_MEM_GEMINI_RATE_LIMITING_ENABLED: 'true',  // Rate limiting ON by default for free tier users
     CLAUDE_MEM_GEMINI_MAX_CONTEXT_MESSAGES: '20',  // Max messages in Gemini context window
@@ -146,10 +147,11 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_REDIS_MODE: 'external',
     CLAUDE_MEM_QUEUE_REDIS_PREFIX: `claude_mem_${process.env.CLAUDE_MEM_WORKER_PORT ?? String(37700 + ((process.getuid?.() ?? 77) % 100))}`,
     CLAUDE_MEM_AUTH_MODE: 'api-key',
-    CLAUDE_MEM_RUNTIME: 'worker',
-    CLAUDE_MEM_SERVER_BETA_URL: `http://127.0.0.1:${process.env.CLAUDE_MEM_SERVER_PORT ?? String(37877 + ((process.getuid?.() ?? 77) % 100))}`,  // Default server-beta runtime URL — UID-derived for multi-account isolation
-    CLAUDE_MEM_SERVER_BETA_API_KEY: '',                     // Local hook API key, populated by installer when runtime=server-beta
-    CLAUDE_MEM_SERVER_BETA_PROJECT_ID: '',                  // Default Postgres project_id used by hooks when runtime=server-beta
+    CLAUDE_MEM_RUNTIME: 'server-beta',
+    CLAUDE_MEM_SERVER_DATABASE_URL: 'postgresql://claude_mem:claude_mem_dev_password@127.0.0.1:5432/claude_mem',
+    CLAUDE_MEM_SERVER_BETA_URL: 'http://127.0.0.1:37954',
+    CLAUDE_MEM_SERVER_BETA_API_KEY: 'cmem_e9dc56dc33e3239cc62ae32df3b8e03d4cd055ee32617c25',
+    CLAUDE_MEM_SERVER_BETA_PROJECT_ID: 'ab3b5412-c008-45a7-80b4-fa56b80f5a11',
   };
 
   static getAllDefaults(): SettingsDefaults {
