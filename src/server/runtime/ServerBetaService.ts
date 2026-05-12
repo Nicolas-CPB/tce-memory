@@ -50,6 +50,85 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
   constructor(private readonly graph: ServerBetaServiceGraph) {}
 
   setupRoutes(app: Application): void {
+    const pool = this.graph.postgres.pool;
+    const uiHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Claude Mem</title><style>:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#d7dde7;background:#0d1117;color-scheme:dark}body{margin:0;background:#0d1117}.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid #263241;background:#111722;position:sticky;top:0;z-index:2}.brand{font-weight:760;color:#f3f6fb}.pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:4px 9px;color:#aab6c7;background:#151e2b}.wrap{max-width:1180px;margin:22px auto;padding:0 16px}.section{margin-bottom:18px}.sectionHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px}.sectionHead h2{font-size:15px;margin:0;color:#e6edf7}.bar,.projectForm{display:grid;grid-template-columns:1fr 92px 98px;gap:8px;margin-bottom:14px}.projectForm{grid-template-columns:1fr 120px}input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #334155;border-radius:6px;background:#0f1622;color:#e6ebf2;padding:10px;outline:none}input:focus,textarea:focus,select:focus{border-color:#4f8cff;box-shadow:0 0 0 3px rgba(79,140,255,.16)}button{border:1px solid #39485c;background:#182233;color:#dce4ee;border-radius:6px;padding:9px 12px;cursor:pointer}button:hover{background:#202c3f}button.primary{background:#2563eb;border-color:#3b82f6;color:#fff}button.primary:hover{background:#1d4ed8}button.danger{color:#fecaca;border-color:#7f1d1d;background:#29171a}button.danger:hover{background:#3a1b20}.grid{display:grid;gap:10px}.projects{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.projectCard,.item{background:#111827;border:1px solid #263241;border-radius:8px;padding:12px}.projectCard .name{font-weight:720;color:#8fd3ff;margin-bottom:6px}.copy{font-family:Consolas,Monaco,monospace;font-size:12px;color:#a8b3c2;word-break:break-all}.meta{display:flex;gap:8px;align-items:center;color:#93a4b8;font-size:12px;flex-wrap:wrap}.kind{font-weight:700;color:#d6e4ff}.project{font-weight:700;color:#8fd3ff;border:1px solid #24445c;background:#102235;border-radius:999px;padding:3px 8px}.id{font-family:Consolas,Monaco,monospace;color:#7f8ea3}.content{white-space:pre-wrap;margin:10px 0;color:#e4e9f1;line-height:1.45}.actions{display:flex;gap:8px}.empty,.err{padding:20px;border:1px dashed #334155;border-radius:8px;color:#9aa8ba;background:#111827}.err{color:#fecaca;border-color:#7f1d1d}dialog{border:1px solid #334155;border-radius:8px;max-width:760px;width:calc(100% - 32px);padding:0;background:#111827;color:#e4e9f1}dialog::backdrop{background:rgba(2,6,23,.72)}.dlg{padding:16px}.dlg h3{margin:0 0 12px}.dlg textarea{width:100%;min-height:220px;box-sizing:border-box}.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}@media(max-width:640px){.bar,.projectForm{grid-template-columns:1fr}.top{padding:0 12px}.wrap{margin:14px auto}}</style></head><body><div class="top"><div class="brand">Claude Mem</div><span class="pill" id="count">carregando</span><span class="pill">server-beta</span></div><main class="wrap"><section class="section"><div class="sectionHead"><h2>Projetos</h2><button id="refreshProjects">Atualizar</button></div><form class="projectForm" id="projectForm"><input id="projectName" placeholder="Nome do projeto"><button class="primary">Cadastrar</button></form><div id="projects" class="projects"></div></section><section class="section"><div class="sectionHead"><h2>Memórias</h2></div><form class="bar" id="search"><input id="q" placeholder="Buscar por conteúdo, projeto ou ID"><select id="limit"><option>20</option><option selected>50</option><option>100</option><option>200</option></select><button class="primary">Buscar</button></form><section id="list" class="grid"></section></section></main><dialog id="dlg"><form method="dialog" class="dlg"><h3>Editar memória</h3><textarea id="editContent"></textarea><div class="row"><button value="cancel">Cancelar</button><button id="save" value="default" class="primary">Salvar</button></div></form></dialog><script>const list=document.getElementById('list'),count=document.getElementById('count'),dlg=document.getElementById('dlg'),edit=document.getElementById('editContent'),projectsEl=document.getElementById('projects');let editing=null;function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}function projectLabel(o){return o.project_name||o.project_id||'sem projeto'}async function api(u,o){const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});if(!r.ok)throw new Error(await r.text());return r.json()}async function loadProjects(){projectsEl.innerHTML='<div class="empty">Carregando projetos...</div>';try{const d=await api('/memory-ui/api/projects');projectsEl.innerHTML=d.projects.length?d.projects.map(p=>'<article class="projectCard"><div class="name">'+esc(p.name)+'</div><div class="copy">'+esc(p.id)+'</div></article>').join(''):'<div class="empty">Nenhum projeto cadastrado.</div>'}catch(e){projectsEl.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}async function load(){list.innerHTML='<div class="empty">Carregando...</div>';try{const q=document.getElementById('q').value,limit=document.getElementById('limit').value;const d=await api('/memory-ui/api/observations?query='+encodeURIComponent(q)+'&limit='+encodeURIComponent(limit));count.textContent=d.total+' memoria'+(d.total===1?'':'s');list.innerHTML=d.observations.length?d.observations.map(o=>'<article class="item"><div class="meta"><span class="project" title="'+esc(o.project_id)+'">'+esc(projectLabel(o))+'</span><span class="kind">'+esc(o.kind)+'</span><span>'+esc(o.created_at)+'</span><span class="id">'+esc(o.id)+'</span></div><div class="content">'+esc(o.content)+'</div><div class="actions"><button data-edit="'+esc(o.id)+'">Editar</button><button class="danger" data-del="'+esc(o.id)+'">Deletar</button></div></article>').join(''):'<div class="empty">Nenhuma memoria encontrada.</div>'}catch(e){list.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}document.getElementById('projectForm').addEventListener('submit',async e=>{e.preventDefault();const name=document.getElementById('projectName').value.trim();if(!name)return;await api('/memory-ui/api/projects',{method:'POST',body:JSON.stringify({name})});document.getElementById('projectName').value='';await loadProjects()});document.getElementById('refreshProjects').addEventListener('click',loadProjects);document.getElementById('search').addEventListener('submit',e=>{e.preventDefault();load()});list.addEventListener('click',async e=>{const ed=e.target.closest('[data-edit]'),del=e.target.closest('[data-del]');if(ed){editing=ed.dataset.edit;edit.value=ed.closest('.item').querySelector('.content').textContent;dlg.showModal()}if(del&&confirm('Deletar esta memoria?')){await api('/memory-ui/api/observations/'+encodeURIComponent(del.dataset.del),{method:'DELETE'});load()}});document.getElementById('save').addEventListener('click',async e=>{e.preventDefault();await api('/memory-ui/api/observations/'+encodeURIComponent(editing),{method:'PATCH',body:JSON.stringify({content:edit.value})});dlg.close();load()});loadProjects();load();</script></body></html>`;
+
+    app.get('/', (req, res) => res.redirect('/memories'));
+    app.get('/memories', (req, res) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(uiHtml);
+    });
+    app.get('/memory-ui', (req, res) => res.redirect('/memories'));
+
+    app.get('/memory-ui/api/projects', async (req, res) => {
+      try {
+        const result = await pool.query('SELECT id,team_id,name,metadata,created_at,updated_at FROM projects ORDER BY name ASC');
+        res.json({ projects: result.rows });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    app.post('/memory-ui/api/projects', async (req, res) => {
+      try {
+        const name = String(req.body?.name ?? '').trim();
+        if (!name) return void res.status(400).json({ error: 'BadRequest', message: 'name is required' });
+        const existing = await pool.query('SELECT id,team_id,name,metadata,created_at,updated_at FROM projects WHERE name = $1 LIMIT 1', [name]);
+        if (existing.rows[0]) return void res.status(200).json({ project: existing.rows[0], created: false });
+        const team = await pool.query('SELECT id FROM teams ORDER BY name ASC LIMIT 1');
+        if (!team.rows[0]) return void res.status(500).json({ error: 'MemoryUiError', message: 'No team found' });
+        const newId = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : 'proj_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+        const result = await pool.query('INSERT INTO projects (id, team_id, name, metadata) VALUES ($1,$2,$3,$4::jsonb) RETURNING id,team_id,name,metadata,created_at,updated_at', [newId, team.rows[0].id, name, '{}']);
+        res.status(201).json({ project: result.rows[0], created: true });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    app.get('/memory-ui/api/observations', async (req, res) => {
+      try {
+        const limit = Math.min(Math.max(parseInt(req.query?.limit as string ?? '50', 10) || 50, 1), 200);
+        const offset = Math.max(parseInt(req.query?.offset as string ?? '0', 10) || 0, 0);
+        const query = String(req.query?.query ?? '').trim();
+        const params: unknown[] = [];
+        let where = '';
+        if (query) {
+          params.push('%' + query + '%');
+          where = 'WHERE o.content ILIKE $1 OR o.kind ILIKE $1 OR o.id ILIKE $1 OR o.project_id ILIKE $1 OR p.name ILIKE $1';
+        }
+        const limitIdx = params.length + 1;
+        const offsetIdx = params.length + 2;
+        const totalResult = await pool.query(`SELECT count(*)::int AS total FROM observations o LEFT JOIN projects p ON p.id=o.project_id ${where}`, params);
+        const result = await pool.query(`SELECT o.id,o.project_id,p.name AS project_name,o.team_id,o.server_session_id,o.kind,o.content,o.metadata,o.created_at,o.updated_at FROM observations o LEFT JOIN projects p ON p.id=o.project_id ${where} ORDER BY o.created_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`, [...params, limit, offset]);
+        res.json({ total: totalResult.rows[0]?.total ?? 0, observations: result.rows });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    app.patch('/memory-ui/api/observations/:id', async (req, res) => {
+      try {
+        const id = String(req.params.id);
+        const content = String(req.body?.content ?? '').trim();
+        if (!content) return void res.status(400).json({ error: 'BadRequest', message: 'content is required' });
+        const result = await pool.query('UPDATE observations SET content = $1, updated_at = now() WHERE id = $2 RETURNING id,project_id,team_id,server_session_id,kind,content,metadata,created_at,updated_at', [content, id]);
+        if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Observation not found' });
+        res.json({ observation: result.rows[0] });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    app.delete('/memory-ui/api/observations/:id', async (req, res) => {
+      try {
+        const id = String(req.params.id);
+        const result = await pool.query('DELETE FROM observations WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Observation not found' });
+        res.json({ deleted: true, id });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
     app.get('/healthz', (_req, res) => {
       res.json({ status: 'ok', runtime: SERVER_BETA_RUNTIME });
     });
