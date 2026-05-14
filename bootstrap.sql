@@ -1,75 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-
-import type { PostgresQueryable } from './utils.js';
-
-export const SERVER_BETA_POSTGRES_SCHEMA_VERSION = 1;
-
-export const SERVER_BETA_POSTGRES_TABLES = [
-  'server_beta_schema_migrations',
-  'teams',
-  'projects',
-  'team_members',
-  'api_keys',
-  'audit_log',
-  'server_sessions',
-  'agent_events',
-  'observation_generation_jobs',
-  'observations',
-  'observation_sources',
-  'observation_generation_job_events'
-] as const;
-
-export async function bootstrapServerBetaPostgresSchema(client: PostgresQueryable): Promise<void> {
-  if (isPostgresPool(client)) {
-    const poolClient = await client.connect();
-    try {
-      await bootstrapServerBetaPostgresSchema(poolClient);
-    } finally {
-      poolClient.release();
-    }
-    return;
-  }
-
-  await client.query('BEGIN');
-  try {
-    await client.query(PHASE_1_SCHEMA_SQL);
-    await client.query(
-      `
-        INSERT INTO server_beta_schema_migrations (version, description)
-        VALUES ($1, $2)
-        ON CONFLICT (version) DO NOTHING
-      `,
-      [SERVER_BETA_POSTGRES_SCHEMA_VERSION, 'phase 1 postgres observation storage foundation']
-    );
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  }
-}
-
-interface PostgresPoolLike extends PostgresQueryable {
-  connect(): Promise<PostgresQueryable & { release(): void }>;
-}
-
-function isPostgresPool(client: PostgresQueryable): client is PostgresPoolLike {
-  const candidate = client as {
-    connect?: unknown;
-    release?: unknown;
-    totalCount?: unknown;
-    idleCount?: unknown;
-    waitingCount?: unknown;
-  };
-  return (
-    typeof candidate.connect === 'function'
-    && typeof candidate.release !== 'function'
-    && typeof candidate.totalCount === 'number'
-    && typeof candidate.idleCount === 'number'
-    && typeof candidate.waitingCount === 'number'
-  );
-}
-
-const PHASE_1_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS server_beta_schema_migrations (
   version INTEGER PRIMARY KEY,
   description TEXT NOT NULL,
@@ -280,4 +208,7 @@ CREATE INDEX IF NOT EXISTS idx_observation_jobs_event ON observation_generation_
 CREATE INDEX IF NOT EXISTS idx_observation_jobs_source ON observation_generation_jobs(source_type, source_id);
 CREATE INDEX IF NOT EXISTS idx_observation_job_events_job_created ON observation_generation_job_events(generation_job_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_scope_created ON audit_log(project_id, team_id, created_at);
-`;
+
+INSERT INTO server_beta_schema_migrations (version, description)
+VALUES (1, 'phase 1 postgres observation storage foundation')
+ON CONFLICT (version) DO NOTHING;

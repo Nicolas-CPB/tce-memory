@@ -42,6 +42,7 @@ export interface ClaudeMemEnv {
   ANTHROPIC_AUTH_TOKEN?: string;
   GEMINI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
+  CLAUDE_MEM_SERVER_BETA_API_KEY?: string;
 }
 
 function parseEnvFile(content: string): Record<string, string> {
@@ -105,6 +106,7 @@ export function loadClaudeMemEnv(): ClaudeMemEnv {
     if (parsed.ANTHROPIC_AUTH_TOKEN) result.ANTHROPIC_AUTH_TOKEN = parsed.ANTHROPIC_AUTH_TOKEN;
     if (parsed.GEMINI_API_KEY) result.GEMINI_API_KEY = parsed.GEMINI_API_KEY;
     if (parsed.OPENROUTER_API_KEY) result.OPENROUTER_API_KEY = parsed.OPENROUTER_API_KEY;
+    if (parsed.CLAUDE_MEM_SERVER_BETA_API_KEY) result.CLAUDE_MEM_SERVER_BETA_API_KEY = parsed.CLAUDE_MEM_SERVER_BETA_API_KEY;
 
     return result;
   } catch (error: unknown) {
@@ -168,6 +170,13 @@ export function saveClaudeMemEnv(env: ClaudeMemEnv): void {
       delete updated.OPENROUTER_API_KEY;
     }
   }
+  if (env.CLAUDE_MEM_SERVER_BETA_API_KEY !== undefined) {
+    if (env.CLAUDE_MEM_SERVER_BETA_API_KEY) {
+      updated.CLAUDE_MEM_SERVER_BETA_API_KEY = env.CLAUDE_MEM_SERVER_BETA_API_KEY;
+    } else {
+      delete updated.CLAUDE_MEM_SERVER_BETA_API_KEY;
+    }
+  }
 
   try {
     writeFileSync(envFile, serializeEnvFile(updated), { encoding: 'utf-8', mode: 0o600 });
@@ -207,6 +216,9 @@ export function buildIsolatedEnv(includeCredentials: boolean = true): Record<str
     }
     if (credentials.OPENROUTER_API_KEY) {
       isolatedEnv.OPENROUTER_API_KEY = credentials.OPENROUTER_API_KEY;
+    }
+    if (credentials.CLAUDE_MEM_SERVER_BETA_API_KEY) {
+      isolatedEnv.CLAUDE_MEM_SERVER_BETA_API_KEY = credentials.CLAUDE_MEM_SERVER_BETA_API_KEY;
     }
 
     // Note: CLAUDE_CODE_OAUTH_TOKEN is intentionally NOT copied from

@@ -26,6 +26,8 @@ import { PostgresServerSessionsRepository } from '../../../storage/postgres/serv
 import type { ServerSessionGenerationPolicy } from '../../runtime/SessionGenerationPolicy.js';
 import { IngestEventsService, type EnqueueOutcome } from '../../services/IngestEventsService.js';
 import { EndSessionService } from '../../services/EndSessionService.js';
+import type { ServerBetaEventBroadcaster } from '../../runtime/types.js';
+import { serializeObservation } from './ServerV1Routes.js';
 
 const SOURCE_ADAPTER_DEFAULT = 'api';
 
@@ -43,6 +45,7 @@ export interface ServerV1PostgresRoutesOptions {
   getSummaryQueue?: () => ReturnType<ActiveServerBetaQueueManager['getQueue']> | null;
   sessionPolicy?: ServerSessionGenerationPolicy;
   sessionDebounceWindowMs?: number;
+  eventBroadcaster: ServerBetaEventBroadcaster;
 }
 
 interface BatchPreValidationFailure {
@@ -822,7 +825,9 @@ export class ServerV1PostgresRoutes implements RouteHandler {
             metadata: body.metadata ?? {},
           });
           await this.auditWrite(req, 'memory.write', observation.id, observation.projectId);
-          res.status(201).json({ memory: serializeObservation(observation) });
+          const serialized = serializeObservation(observation);
+          this.options.eventBroadcaster.broadcast({ type: 'observation_created', observation: serialized });
+          res.status(201).json({ memory: serialized });
         } catch (error) {
           this.handleDbError(error, res, 'memory.write');
         }

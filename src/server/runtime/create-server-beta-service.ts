@@ -12,6 +12,7 @@ import { ClaudeObservationProvider } from '../generation/providers/ClaudeObserva
 import { GeminiObservationProvider } from '../generation/providers/GeminiObservationProvider.js';
 import { OpenRouterObservationProvider } from '../generation/providers/OpenRouterObservationProvider.js';
 import type { ServerGenerationProvider } from '../generation/providers/shared/types.js';
+import { ActiveServerBetaEventBroadcaster } from './ActiveServerBetaEventBroadcaster.js';
 import { ServerBetaService } from './ServerBetaService.js';
 import {
   DisabledServerBetaEventBroadcaster,
@@ -165,12 +166,14 @@ export async function createServerBetaService(
   const generationDisabled = options.generationDisabled
     ?? (process.env.CLAUDE_MEM_GENERATION_DISABLED === '1'
       || process.env.CLAUDE_MEM_GENERATION_DISABLED === 'true');
+  const eventBroadcaster = new ActiveServerBetaEventBroadcaster();
   const generationWorkerManager = options.generationWorkerManager
     ?? (generationDisabled
       ? new DisabledServerBetaGenerationWorkerManager(
           'CLAUDE_MEM_GENERATION_DISABLED is set; this server runs HTTP only. A separate `claude-mem server worker start` process consumes the BullMQ queues.',
         )
-      : buildGenerationWorkerManager(pool, queueManager, options.generationProvider));
+      : buildGenerationWorkerManager(pool, queueManager, options.generationProvider, eventBroadcaster));
+
   const graph: ServerBetaServiceGraph = {
     runtime: 'server-beta',
     postgres: {
@@ -181,7 +184,7 @@ export async function createServerBetaService(
     queueManager,
     generationWorkerManager,
     providerRegistry: new DisabledServerBetaProviderRegistry('Phase 5 keeps the provider registry boundary as inert; per-call providers are owned by the generation worker manager.'),
-    eventBroadcaster: new DisabledServerBetaEventBroadcaster('Phase 2 boundary only; SSE/event broadcasting is not wired.'),
+    eventBroadcaster,
     storage: createPostgresStorageRepositories(pool),
   };
 
@@ -195,7 +198,8 @@ export async function createServerBetaService(
 function buildGenerationWorkerManager(
   pool: PostgresPool,
   queueManager: ServerBetaQueueManager,
-  injectedProvider?: ServerGenerationProvider,
+  injectedProvider: ServerGenerationProvider | undefined,
+  eventBroadcaster: ServerBetaEventBroadcaster,
 ): ServerBetaGenerationWorkerManager {
   if (!(queueManager instanceof ActiveServerBetaQueueManager)) {
     return new DisabledServerBetaGenerationWorkerManager(
@@ -212,6 +216,7 @@ function buildGenerationWorkerManager(
     pool,
     queueManager,
     provider,
+    eventBroadcaster,
   });
 }
 

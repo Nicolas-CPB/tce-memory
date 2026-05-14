@@ -59,6 +59,8 @@ export interface ServerBetaProviderRegistry {
 export interface ServerBetaEventBroadcaster {
   readonly kind: 'event-broadcaster';
   getHealth(): ServerBetaBoundaryHealth;
+  broadcast(event: any): void;
+  addClient(res: any): void;
   close(): Promise<void>;
 }
 
@@ -105,4 +107,6 @@ export class DisabledServerBetaProviderRegistry extends DisabledServerBetaBounda
 
 export class DisabledServerBetaEventBroadcaster extends DisabledServerBetaBoundary implements ServerBetaEventBroadcaster {
   readonly kind = 'event-broadcaster' as const;
+  broadcast(): void {}
+  addClient(): void {}
 }

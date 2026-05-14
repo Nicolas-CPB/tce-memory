@@ -46,7 +46,12 @@ export function useSettings() {
 
           CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY: data.CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY ?? DEFAULT_SETTINGS.CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY,
           CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE: data.CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE ?? DEFAULT_SETTINGS.CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE,
+          CLAUDE_MEM_SERVER_BETA_API_KEY: data.CLAUDE_MEM_SERVER_BETA_API_KEY ?? localStorage.getItem('CLAUDE_MEM_SERVER_BETA_API_KEY') ?? DEFAULT_SETTINGS.CLAUDE_MEM_SERVER_BETA_API_KEY,
         });
+
+        if (data.CLAUDE_MEM_SERVER_BETA_API_KEY) {
+          localStorage.setItem('CLAUDE_MEM_SERVER_BETA_API_KEY', data.CLAUDE_MEM_SERVER_BETA_API_KEY);
+        }
       })
       .catch(error => {
         console.error('Failed to load settings:', error);
@@ -73,6 +78,9 @@ export function useSettings() {
       const result = await response.json();
 
       if (result.success) {
+        if (newSettings.CLAUDE_MEM_SERVER_BETA_API_KEY) {
+          localStorage.setItem('CLAUDE_MEM_SERVER_BETA_API_KEY', newSettings.CLAUDE_MEM_SERVER_BETA_API_KEY);
+        }
         setSettings(newSettings);
         setSaveStatus('✓ Saved');
         setTimeout(() => setSaveStatus(''), TIMING.SAVE_STATUS_DISPLAY_DURATION_MS);

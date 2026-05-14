@@ -22,6 +22,7 @@ import {
   type ProcessGeneratedResponseOutcome,
 } from './processGeneratedResponse.js';
 import { PostgresServerSessionsRepository } from '../../storage/postgres/server-sessions.js';
+import type { ServerBetaEventBroadcaster } from '../runtime/types.js';
 
 // Phase 11 — sentinel exception class so the worker can distinguish
 // scope-violation/revoked-key failures from generic processor errors and
@@ -55,6 +56,7 @@ export class ServerGenerationScopeViolationError extends Error {
 export interface ProviderObservationGeneratorOptions {
   pool: PostgresPool;
   provider: ServerGenerationProvider;
+  eventBroadcaster?: ServerBetaEventBroadcaster;
   workerId?: string;
 }
 
@@ -246,6 +248,54 @@ export class ProviderObservationGenerator {
         observationCount: outcome.observations.length,
         privateContentDetected: outcome.privateContentDetected,
       });
+
+      if (this.options.eventBroadcaster && outcome.observations.length > 0) {
+        for (const obs of outcome.observations) {
+          // Admin UI always wants observation_created
+          this.options.eventBroadcaster.broadcast({ type: 'observation_created', observation: obs });
+
+          // Viewer UI wants specific events
+          if (obs.kind === 'summary') {
+            this.options.eventBroadcaster.broadcast({ 
+              type: 'new_summary', 
+              summary: {
+                id: obs.id as any,
+                session_id: obs.serverSessionId || '',
+                project: obs.projectId,
+                platform_source: (obs.metadata as any)?.platformSource || 'api',
+                request: (obs.metadata as any)?.request,
+                investigated: (obs.metadata as any)?.investigated,
+                learned: (obs.metadata as any)?.learned,
+                completed: (obs.metadata as any)?.completed,
+                next_steps: (obs.metadata as any)?.next_steps,
+                created_at_epoch: (obs.createdAtEpoch as any) || Date.now()
+              }
+            });
+          } else {
+            this.options.eventBroadcaster.broadcast({ 
+              type: 'new_observation', 
+              observation: {
+                id: obs.id as any,
+                memory_session_id: obs.serverSessionId || '',
+                project: obs.projectId,
+                type: obs.kind,
+                title: (obs.metadata as any)?.title || null,
+                subtitle: (obs.metadata as any)?.subtitle || null,
+                narrative: (obs.metadata as any)?.narrative || null,
+                facts: Array.isArray((obs.metadata as any)?.facts) ? (obs.metadata as any).facts.join('\n') : (obs.metadata as any)?.facts || null,
+                concepts: (obs.metadata as any)?.concepts || null,
+                files_read: (obs.metadata as any)?.files_read || null,
+                files_modified: (obs.metadata as any)?.files_modified || null,
+                created_at: new Date(obs.createdAtEpoch || Date.now()).toISOString(),
+                created_at_epoch: obs.createdAtEpoch || Date.now(),
+                platform_source: (obs.metadata as any)?.platformSource || 'api',
+                prompt_number: null,
+                text: obs.content
+              }
+            });
+          }
+        }
+      }
 
       return {
         jobId: outcome.jobId,

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Application } from 'express';
+import express from 'express';
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import net from 'net';
-import { dirname } from 'path';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { Server, type RouteHandler } from '../../services/server/Server.js';
 import { paths } from '../../shared/paths.js';
@@ -15,6 +16,7 @@ import {
   type PidInfo,
 } from '../../supervisor/process-registry.js';
 import { ServerV1PostgresRoutes } from '../routes/v1/ServerV1PostgresRoutes.js';
+import { PostgresViewerRoutes } from '../routes/PostgresViewerRoutes.js';
 import { SessionsObservationsAdapter } from '../compat/SessionsObservationsAdapter.js';
 import { SessionsSummarizeAdapter } from '../compat/SessionsSummarizeAdapter.js';
 import { ActiveServerBetaQueueManager } from './ActiveServerBetaQueueManager.js';
@@ -51,14 +53,26 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
 
   setupRoutes(app: Application): void {
     const pool = this.graph.postgres.pool;
-      const uiHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Claude Mem</title><style>:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#d7dde7;background:#0d1117;color-scheme:dark}body{margin:0;background:#0d1117}.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid #263241;background:#111722;position:sticky;top:0;z-index:2}.brand{font-weight:760;color:#f3f6fb}.pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:4px 9px;color:#aab6c7;background:#151e2b}.wrap{max-width:1180px;margin:22px auto;padding:0 16px}.section{margin-bottom:18px}.sectionHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px}.sectionHead h2{font-size:15px;margin:0;color:#e6edf7}.bar,.projectForm{display:grid;grid-template-columns:1fr 92px 98px;gap:8px;margin-bottom:14px}.projectForm{grid-template-columns:1fr 120px}input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #334155;border-radius:6px;background:#0f1622;color:#e6ebf2;padding:10px;outline:none}input:focus,textarea:focus,select:focus{border-color:#4f8cff;box-shadow:0 0 0 3px rgba(79,140,255,.16)}button{border:1px solid #39485c;background:#182233;color:#dce4ee;border-radius:6px;padding:9px 12px;cursor:pointer}button:hover{background:#202c3f}button.primary{background:#2563eb;border-color:#3b82f6;color:#fff}button.primary:hover{background:#1d4ed8}button.danger{color:#fecaca;border-color:#7f1d1d;background:#29171a}button.danger:hover{background:#3a1b20}.grid{display:grid;gap:10px}.projects{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.projectCard,.item{background:#111827;border:1px solid #263241;border-radius:8px;padding:12px}.projectCard .name{font-weight:720;color:#8fd3ff;margin-bottom:6px}.copy{font-family:Consolas,Monaco,monospace;font-size:12px;color:#a8b3c2;word-break:break-all}.meta{display:flex;gap:8px;align-items:center;color:#93a4b8;font-size:12px;flex-wrap:wrap}.kind{font-weight:700;color:#d6e4ff}.project{font-weight:700;color:#8fd3ff;border:1px solid #24445c;background:#102235;border-radius:999px;padding:3px 8px}.id{font-family:Consolas,Monaco,monospace;color:#7f8ea3}.content{white-space:pre-wrap;margin:10px 0;color:#e4e9f1;line-height:1.45}.actions{display:flex;gap:8px}.empty,.err{padding:20px;border:1px dashed #334155;border-radius:8px;color:#9aa8ba;background:#111827}.err{color:#fecaca;border-color:#7f1d1d}dialog{border:1px solid #334155;border-radius:8px;max-width:760px;width:calc(100% - 32px);padding:0;background:#111827;color:#e4e9f1}dialog::backdrop{background:rgba(2,6,23,.72)}.dlg{padding:16px}.dlg h3{margin:0 0 12px}.dlg textarea{width:100%;min-height:220px;box-sizing:border-box}.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}@media(max-width:640px){.bar,.projectForm{grid-template-columns:1fr}.top{padding:0 12px}.wrap{margin:14px auto}}</style></head><body><div class="top"><div class="brand">Claude Mem</div><span class="pill" id="count">carregando</span><span class="pill">server-beta</span></div><main class="wrap"><section class="section"><div class="sectionHead"><h2>Times</h2><button id="refreshTeams">Atualizar</button></div><form class="projectForm" id="teamForm"><input id="teamName" placeholder="Nome do time"><button class="primary">Cadastrar</button></form><div id="teams" class="projects"></div></section><section class="section"><div class="sectionHead"><h2>Projetos</h2><button id="refreshProjects">Atualizar</button></div><form class="projectForm" id="projectForm"><input id="projectName" placeholder="Nome do projeto"><button class="primary">Cadastrar</button></form><div id="projects" class="projects"></div></section><section class="section"><div class="sectionHead"><h2>Memórias</h2></div><form class="bar" id="search"><input id="q" placeholder="Buscar por conteúdo, projeto ou ID"><select id="limit"><option>20</option><option selected>50</option><option>100</option><option>200</option></select><button class="primary">Buscar</button></form><section id="list" class="grid"></section></section></main><dialog id="dlg"><form method="dialog" class="dlg"><h3>Editar memória</h3><textarea id="editContent"></textarea><div class="row"><button value="cancel">Cancelar</button><button id="save" value="default" class="primary">Salvar</button></div></form></dialog><script>const list=document.getElementById('list'),count=document.getElementById('count'),dlg=document.getElementById('dlg'),edit=document.getElementById('editContent'),projectsEl=document.getElementById('projects'),teamsEl=document.getElementById('teams');let editing=null;function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}function projectLabel(o){return o.project_name||o.project_id||'sem projeto'}async function api(u,o){const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});if(!r.ok)throw new Error(await r.text());return r.json()}async function loadTeams(){teamsEl.innerHTML='<div class="empty">Carregando times...</div>';try{const d=await api('/memory-ui/api/teams');teamsEl.innerHTML=d.teams.length?d.teams.map(t=>'<article class="projectCard"><div class="name">'+esc(t.name)+'</div><div class="copy">'+esc(t.id)+'</div></article>').join(''):'<div class="empty">Nenhum time cadastrado.</div>'}catch(e){teamsEl.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}async function loadProjects(){projectsEl.innerHTML='<div class="empty">Carregando projetos...</div>';try{const d=await api('/memory-ui/api/projects');projectsEl.innerHTML=d.projects.length?d.projects.map(p=>'<article class="projectCard"><div class="name">'+esc(p.name)+'</div><div class="copy">'+esc(p.id)+'</div></article>').join(''):'<div class="empty">Nenhum projeto cadastrado.</div>'}catch(e){projectsEl.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}async function load(){list.innerHTML='<div class="empty">Carregando...</div>';try{const q=document.getElementById('q').value,limit=document.getElementById('limit').value;const d=await api('/memory-ui/api/observations?query='+encodeURIComponent(q)+'&limit='+encodeURIComponent(limit));count.textContent=d.total+' memoria'+(d.total===1?'':'s');list.innerHTML=d.observations.length?d.observations.map(o=>'<article class="item"><div class="meta"><span class="project" title="'+esc(o.project_id)+'">'+esc(projectLabel(o))+'</span><span class="kind">'+esc(o.kind)+'</span><span>'+esc(o.created_at)+'</span><span class="id">'+esc(o.id)+'</span></div><div class="content">'+esc(o.content)+'</div><div class="actions"><button data-edit="'+esc(o.id)+'">Editar</button><button class="danger" data-del="'+esc(o.id)+'">Deletar</button></div></article>').join(''):'<div class="empty">Nenhuma memoria encontrada.</div>'}catch(e){list.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}document.getElementById('teamForm').addEventListener('submit',async e=>{e.preventDefault();const name=document.getElementById('teamName').value.trim();if(!name)return;await api('/memory-ui/api/teams',{method:'POST',body:JSON.stringify({name})});document.getElementById('teamName').value='';await loadTeams()});document.getElementById('projectForm').addEventListener('submit',async e=>{e.preventDefault();const name=document.getElementById('projectName').value.trim();if(!name)return;await api('/memory-ui/api/projects',{method:'POST',body:JSON.stringify({name})});document.getElementById('projectName').value='';await loadProjects()});document.getElementById('refreshTeams').addEventListener('click',loadTeams);document.getElementById('refreshProjects').addEventListener('click',loadProjects);document.getElementById('search').addEventListener('submit',e=>{e.preventDefault();load()});list.addEventListener('click',async e=>{const ed=e.target.closest('[data-edit]'),del=e.target.closest('[data-del]');if(ed){editing=ed.dataset.edit;edit.value=ed.closest('.item').querySelector('.content').textContent;dlg.showModal()}if(del&&confirm('Deletar esta memoria?')){await api('/memory-ui/api/observations/'+encodeURIComponent(del.dataset.del),{method:'DELETE'});load()}});document.getElementById('save').addEventListener('click',async e=>{e.preventDefault();await api('/memory-ui/api/observations/'+encodeURIComponent(editing),{method:'PATCH',body:JSON.stringify({content:edit.value})});dlg.close();load()});loadTeams();loadProjects();load();</script></body></html>`;
+      const uiHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Claude Mem</title><style>:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#d7dde7;background:#0d1117;color-scheme:dark}body{margin:0;background:#0d1117}.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid #263241;background:#111722;position:sticky;top:0;z-index:2}.brand{font-weight:760;color:#f3f6fb}.pill{font-size:12px;border:1px solid #334155;border-radius:999px;padding:4px 9px;color:#aab6c7;background:#151e2b}.wrap{max-width:1180px;margin:22px auto;padding:0 16px}.section{margin-bottom:18px}.sectionHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px}.sectionHead h2{font-size:15px;margin:0;color:#e6edf7}.bar,.projectForm{display:grid;grid-template-columns:1fr 92px 98px;gap:8px;margin-bottom:14px}.projectForm{grid-template-columns:1fr 120px}input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #334155;border-radius:6px;background:#0f1622;color:#e6ebf2;padding:10px;outline:none}input:focus,textarea:focus,select:focus{border-color:#4f8cff;box-shadow:0 0 0 3px rgba(79,140,255,.16)}button{border:1px solid #39485c;background:#182233;color:#dce4ee;border-radius:6px;padding:9px 12px;cursor:pointer}button:hover{background:#202c3f}button.primary{background:#2563eb;border-color:#3b82f6;color:#fff}button.primary:hover{background:#1d4ed8}button.danger{color:#fecaca;border-color:#7f1d1d;background:#29171a}button.danger:hover{background:#3a1b20}.grid{display:grid;gap:10px}.projects{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.projectCard,.item{background:#111827;border:1px solid #263241;border-radius:8px;padding:12px}.projectCard .name{font-weight:720;color:#8fd3ff;margin-bottom:6px}.copy{font-family:Consolas,Monaco,monospace;font-size:12px;color:#a8b3c2;word-break:break-all}.meta{display:flex;gap:8px;align-items:center;color:#93a4b8;font-size:12px;flex-wrap:wrap}.kind{font-weight:700;color:#d6e4ff}.project{font-weight:700;color:#8fd3ff;border:1px solid #24445c;background:#102235;border-radius:999px;padding:3px 8px}.id{font-family:Consolas,Monaco,monospace;color:#7f8ea3}.content{white-space:pre-wrap;margin:10px 0;color:#e4e9f1;line-height:1.45}.actions{display:flex;gap:8px}.empty,.err{padding:20px;border:1px dashed #334155;border-radius:8px;color:#9aa8ba;background:#111827}.err{color:#fecaca;border-color:#7f1d1d}dialog{border:1px solid #334155;border-radius:8px;max-width:760px;width:calc(100% - 32px);padding:0;background:#111827;color:#e4e9f1;margin:auto}dialog::backdrop{background:rgba(2,6,23,.72)}.dlg{padding:16px}.dlg h3{margin:0 0 12px}.dlg textarea{width:100%;min-height:220px;box-sizing:border-box}.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}@media(max-width:640px){.bar,.projectForm{grid-template-columns:1fr}.top{padding:0 12px}.wrap{margin:14px auto}}</style></head><body><div class="top"><div class="brand">Claude Mem</div><span class="pill" id="count">carregando</span><span class="pill">server-beta</span></div><main class="wrap"><section class="section"><div class="sectionHead"><h2>Times</h2><button id="refreshTeams">Atualizar</button></div><form class="projectForm" id="teamForm"><input id="teamName" placeholder="Nome do time"><button class="primary">Cadastrar</button></form><div id="teams" class="projects"></div></section><section class="section"><div class="sectionHead"><h2>Projetos</h2><button id="refreshProjects">Atualizar</button></div><form class="projectForm" id="projectForm"><input id="projectName" placeholder="Nome do projeto"><button class="primary">Cadastrar</button></form><div id="projects" class="projects"></div></section><section class="section"><div class="sectionHead"><h2>Memórias</h2></div><form class="bar" id="search"><input id="q" placeholder="Buscar por conteúdo, projeto ou ID"><select id="limit"><option>20</option><option selected>50</option><option>100</option><option>200</option></select><button class="primary">Buscar</button></form><section id="list" class="grid"></section></section></main><dialog id="dlg"><form method="dialog" class="dlg"><h3>Editar memória</h3><textarea id="editContent"></textarea><div class="row"><button value="cancel">Cancelar</button><button id="save" value="default" class="primary">Salvar</button></div></form></dialog><script>const list=document.getElementById('list'),count=document.getElementById('count'),dlg=document.getElementById('dlg'),edit=document.getElementById('editContent'),projectsEl=document.getElementById('projects'),teamsEl=document.getElementById('teams');let editing=null;function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}function projectLabel(o){return o.project_name||o.project_id||'sem projeto'}async function api(u,o){const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});if(!r.ok)throw new Error(await r.text());return r.json()}async function loadTeams(){teamsEl.innerHTML='<div class="empty">Carregando times...</div>';try{const d=await api('/memory-ui/api/teams');teamsEl.innerHTML=d.teams.length?d.teams.map(t=>'<article class="projectCard"><div class="name">'+esc(t.name)+'</div><div class="copy">'+esc(t.id)+'</div></article>').join(''):'<div class="empty">Nenhum time cadastrado.</div>'}catch(e){teamsEl.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}async function loadProjects(){projectsEl.innerHTML='<div class="empty">Carregando projetos...</div>';try{const d=await api('/memory-ui/api/projects');projectsEl.innerHTML=d.projects.length?d.projects.map(p=>'<article class="projectCard"><div class="name">'+esc(p.name)+'</div><div class="copy">'+esc(p.id)+'</div></article>').join(''):'<div class="empty">Nenhum projeto cadastrado.</div>'}catch(e){projectsEl.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}async function load(){list.innerHTML='<div class="empty">Carregando...</div>';try{const q=document.getElementById('q').value,limit=document.getElementById('limit').value;const d=await api('/memory-ui/api/observations?query='+encodeURIComponent(q)+'&limit='+encodeURIComponent(limit));count.textContent=d.total+' memoria'+(d.total===1?'':'s');list.innerHTML=d.observations.length?d.observations.map(o=>'<article class="item"><div class="meta"><span class="project" title="'+esc(o.project_id)+'">'+esc(projectLabel(o))+'</span><span class="kind">'+esc(o.kind)+'</span><span>'+esc(o.created_at)+'</span><span class="id">'+esc(o.id)+'</span></div><div class="content">'+esc(o.content)+'</div><div class="actions"><button data-edit="'+esc(o.id)+'">Editar</button><button class="danger" data-del="'+esc(o.id)+'">Deletar</button></div></article>').join(''):'<div class="empty">Nenhuma memoria encontrada.</div>'}catch(e){list.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}document.getElementById('teamForm').addEventListener('submit',async e=>{e.preventDefault();const name=document.getElementById('teamName').value.trim();if(!name)return;await api('/memory-ui/api/teams',{method:'POST',body:JSON.stringify({name})});document.getElementById('teamName').value='';await loadTeams()});document.getElementById('projectForm').addEventListener('submit',async e=>{e.preventDefault();const name=document.getElementById('projectName').value.trim();if(!name)return;await api('/memory-ui/api/projects',{method:'POST',body:JSON.stringify({name})});document.getElementById('projectName').value='';await loadProjects()});document.getElementById('refreshTeams').addEventListener('click',loadTeams);document.getElementById('refreshProjects').addEventListener('click',loadProjects);document.getElementById('search').addEventListener('submit',e=>{e.preventDefault();load()});list.addEventListener('click',async e=>{const ed=e.target.closest('[data-edit]'),del=e.target.closest('[data-del]');if(ed){editing=ed.dataset.edit;edit.value=ed.closest('.item').querySelector('.content').textContent;dlg.showModal()}if(del&&confirm('Deletar esta memoria?')){await api('/memory-ui/api/observations/'+encodeURIComponent(del.dataset.del),{method:'DELETE'});load()}});document.getElementById('save').addEventListener('click',async e=>{e.preventDefault();await api('/memory-ui/api/observations/'+encodeURIComponent(editing),{method:'PATCH',body:JSON.stringify({content:edit.value})});dlg.close();load()});loadTeams();loadProjects();load();</script></body></html>`;
 
-    app.get('/', (req, res) => res.redirect('/memories'));
-    app.get('/memories', (req, res) => {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.send(uiHtml);
-    });
-    app.get('/memory-ui', (req, res) => res.redirect('/memories'));
+    // Serve static admin UI — resolve path that works from both TS source and compiled bundle
+    const _scriptDir = typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
+    const _adminCandidates = [
+      // Running from TS source: src/server/runtime/ -> repo root -> src/ui/admin
+      resolve(_scriptDir, '..', '..', '..', 'src', 'ui', 'admin'),
+      // Running from compiled bundle: plugin/scripts/ -> repo root -> src/ui/admin
+      resolve(_scriptDir, '..', '..', 'src', 'ui', 'admin'),
+      // Fallback: cwd-relative
+      resolve(process.cwd(), 'src', 'ui', 'admin'),
+    ];
+    const adminDir = _adminCandidates.find(p => existsSync(join(p, 'index.html'))) ?? _adminCandidates[0]!;
+    app.use('/admin', express.static(adminDir));
+    app.get('/', (_req, res) => res.redirect('/admin'));
+    app.get('/admin', (_req, res) => res.sendFile(join(adminDir, 'index.html')));
+    app.get('/memories', (_req, res) => res.redirect('/admin#memories'));
+    app.get('/memory-ui', (_req, res) => res.redirect('/admin'));
+    app.get('/stream', (req, res) => this.graph.eventBroadcaster.addClient(res));
+
 
     app.get('/memory-ui/api/teams', async (req, res) => {
       try {
@@ -78,7 +92,9 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
         
         const newId = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : 'team_' + Date.now() + '_' + Math.random().toString(16).slice(2);
         const result = await pool.query('INSERT INTO teams (id, name, metadata) VALUES ($1,$2,$3::jsonb) RETURNING id,name,metadata,created_at,updated_at', [newId, name, '{}']);
-        res.status(201).json({ team: result.rows[0], created: true });
+        const team = result.rows[0];
+        this.graph.eventBroadcaster.broadcast({ type: 'new_team', team });
+        res.status(201).json({ team, created: true });
       } catch (err: unknown) {
         res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
       }
@@ -95,15 +111,23 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
 
     app.post('/memory-ui/api/projects', async (req, res) => {
       try {
-        const name = String(req.body?.name ?? '').trim();
+        const name   = String(req.body?.name   ?? '').trim();
+        const teamId = String(req.body?.teamId ?? '').trim();
         if (!name) return void res.status(400).json({ error: 'BadRequest', message: 'name is required' });
         const existing = await pool.query('SELECT id,team_id,name,metadata,created_at,updated_at FROM projects WHERE name = $1 LIMIT 1', [name]);
         if (existing.rows[0]) return void res.status(200).json({ project: existing.rows[0], created: false });
-        const team = await pool.query('SELECT id FROM teams ORDER BY name ASC LIMIT 1');
-        if (!team.rows[0]) return void res.status(500).json({ error: 'MemoryUiError', message: 'No team found' });
+        // Use provided teamId or fall back to first team
+        let resolvedTeamId = teamId;
+        if (!resolvedTeamId) {
+          const team = await pool.query('SELECT id FROM teams ORDER BY name ASC LIMIT 1');
+          if (!team.rows[0]) return void res.status(500).json({ error: 'MemoryUiError', message: 'No team found — create a team first' });
+          resolvedTeamId = team.rows[0].id as string;
+        }
         const newId = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : 'proj_' + Date.now() + '_' + Math.random().toString(16).slice(2);
-        const result = await pool.query('INSERT INTO projects (id, team_id, name, metadata) VALUES ($1,$2,$3,$4::jsonb) RETURNING id,team_id,name,metadata,created_at,updated_at', [newId, team.rows[0].id, name, '{}']);
-        res.status(201).json({ project: result.rows[0], created: true });
+        const result = await pool.query('INSERT INTO projects (id, team_id, name, metadata) VALUES ($1,$2,$3,$4::jsonb) RETURNING id,team_id,name,metadata,created_at,updated_at', [newId, resolvedTeamId, name, '{}']);
+        const project = result.rows[0];
+        this.graph.eventBroadcaster.broadcast({ type: 'new_project', project });
+        res.status(201).json({ project, created: true });
       } catch (err: unknown) {
         res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
       }
@@ -137,7 +161,182 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
         if (!content) return void res.status(400).json({ error: 'BadRequest', message: 'content is required' });
         const result = await pool.query('UPDATE observations SET content = $1, updated_at = now() WHERE id = $2 RETURNING id,project_id,team_id,server_session_id,kind,content,metadata,created_at,updated_at', [content, id]);
         if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Observation not found' });
-        res.json({ observation: result.rows[0] });
+        const observation = result.rows[0];
+        this.graph.eventBroadcaster.broadcast({ type: 'observation_updated', observation });
+        res.json({ observation });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    // DELETE /memory-ui/api/teams/:id
+    app.delete('/memory-ui/api/teams/:id', async (req, res) => {
+      try {
+        const id = String(req.params.id);
+        const result = await pool.query('DELETE FROM teams WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Team not found' });
+        this.graph.eventBroadcaster.broadcast({ type: 'team_deleted', id });
+        res.json({ deleted: true, id });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    // DELETE /memory-ui/api/projects/:id
+    app.delete('/memory-ui/api/projects/:id', async (req, res) => {
+      try {
+        const id = String(req.params.id);
+        const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING id', [id]);
+        if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Project not found' });
+        this.graph.eventBroadcaster.broadcast({ type: 'project_deleted', id });
+        res.json({ deleted: true, id });
+      } catch (err: unknown) {
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    // POST /memory-ui/api/projects/:id/link-team
+    // This endpoint handles moving a project to a new team.
+    // Because the schema uses composite FKs (project_id, team_id) without ON UPDATE CASCADE,
+    // a simple update on projects(team_id) violates FKs in audit_log, observations, etc.
+    // We handle this by trying to upgrade the constraints to ON UPDATE CASCADE dynamically,
+    // or manually updating all tables in a transaction.
+    app.post('/memory-ui/api/projects/:id/link-team', async (req, res) => {
+      const id     = String(req.params.id);
+      const teamId = String(req.body?.teamId ?? '').trim();
+      if (!teamId) return void res.status(400).json({ error: 'BadRequest', message: 'teamId is required' });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Verify target project and team exist
+        const projRow = await client.query('SELECT id, team_id FROM projects WHERE id = $1 FOR UPDATE', [id]);
+        if (!projRow.rows[0]) {
+          await client.query('ROLLBACK');
+          return void res.status(404).json({ error: 'NotFound', message: 'Project not found' });
+        }
+        const oldTeamId = projRow.rows[0].team_id;
+        if (oldTeamId === teamId) {
+          await client.query('ROLLBACK');
+          return res.json({ project: projRow.rows[0], message: 'Already linked to this team' });
+        }
+
+        const teamRow = await client.query('SELECT id FROM teams WHERE id = $1', [teamId]);
+        if (!teamRow.rows[0]) {
+          await client.query('ROLLBACK');
+          return void res.status(404).json({ error: 'NotFound', message: 'Team not found' });
+        }
+
+        // 2. Attempt to "upgrade" constraints to ON UPDATE CASCADE if they are restrictive.
+        // This is the most robust way to allow future moves as well.
+        const fkUpgrades = [
+          { tbl: 'audit_log',                    fk: 'audit_log_project_id_team_id_fkey',                    ref: 'projects(id, team_id)', action: 'ON DELETE SET NULL' },
+          { tbl: 'api_keys',                     fk: 'api_keys_project_id_team_id_fkey',                     ref: 'projects(id, team_id)', action: 'ON DELETE CASCADE' },
+          { tbl: 'server_sessions',              fk: 'server_sessions_project_id_team_id_fkey',              ref: 'projects(id, team_id)', action: 'ON DELETE CASCADE' },
+          { tbl: 'agent_events',                 fk: 'agent_events_project_id_team_id_fkey',                 ref: 'projects(id, team_id)', action: 'ON DELETE CASCADE' },
+          { tbl: 'observation_generation_jobs',  fk: 'observation_generation_jobs_project_id_team_id_fkey',  ref: 'projects(id, team_id)', action: 'ON DELETE CASCADE' },
+          { tbl: 'observation_generation_jobs',  fk: 'observation_generation_jobs_agent_event_id_project_i', ref: 'agent_events(id, project_id, team_id)', action: 'ON DELETE CASCADE' },
+          { tbl: 'observations',                 fk: 'observations_project_id_team_id_fkey',                 ref: 'projects(id, team_id)', action: 'ON DELETE CASCADE' },
+        ];
+
+        for (const { tbl, fk, ref, action } of fkUpgrades) {
+          try {
+            const exists = await client.query(`SELECT 1 FROM pg_constraint WHERE conname = $1`, [fk]);
+            if (exists.rows.length > 0) {
+              await client.query(`ALTER TABLE ${tbl} DROP CONSTRAINT ${fk}`);
+              await client.query(`ALTER TABLE ${tbl} ADD CONSTRAINT ${fk} FOREIGN KEY (${ref.includes('agent_event') ? 'agent_event_id, project_id, team_id' : 'project_id, team_id'}) REFERENCES ${ref} ${action} ON UPDATE CASCADE`);
+            }
+          } catch (e) {
+            logger.error(`[MemoryUi] Failed to upgrade FK ${fk} on ${tbl}:`, e);
+          }
+        }
+
+        // 3. Update the project. If ON UPDATE CASCADE worked, all others follow.
+        const result = await client.query(
+          'UPDATE projects SET team_id = $1, updated_at = now() WHERE id = $2 RETURNING id,team_id,name,metadata,created_at,updated_at',
+          [teamId, id]
+        );
+
+        // 4. Manual fallback for any tables that didn't get CASCADE upgraded.
+        // Special case for api_keys: we update keys bound to this project.
+        // Keys bound only to the old team stay there, as they might own other projects.
+        const tablesToUpdate = [
+          'audit_log',
+          'observations',
+          'server_sessions',
+          'agent_events',
+          'observation_generation_jobs',
+          'api_keys'
+        ];
+
+        for (const tbl of tablesToUpdate) {
+          try {
+            await client.query(`UPDATE ${tbl} SET team_id = $1 WHERE project_id = $2 AND team_id != $1`, [teamId, id]);
+          } catch (e) {
+            logger.warn(`[MemoryUi] Fallback update failed for ${tbl}:`, e);
+          }
+        }
+
+        // 5. Special check: if the current API key used for this request is a team-level key
+        // and it was bound to the old team, and now this project (the only one or main one) 
+        // moved, the user might expect the key to move too. 
+        // However, we'll stick to project-bound keys for auto-migration.
+        
+        await client.query('COMMIT');
+        res.json({ project: result.rows[0] });
+      } catch (err: unknown) {
+        await client.query('ROLLBACK').catch(() => {});
+        logger.error('[MemoryUi] Failed to link team:', err);
+        res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
+      } finally {
+        client.release();
+      }
+    });
+
+    // POST /memory-ui/api/observations — create manual observation
+    app.post('/memory-ui/api/observations', async (req, res) => {
+      try {
+        const projectId = String(req.body?.projectId ?? '').trim();
+        const content   = String(req.body?.content   ?? '').trim();
+        const kind      = String(req.body?.kind      ?? 'manual').trim() || 'manual';
+        if (!projectId) return void res.status(400).json({ error: 'BadRequest', message: 'projectId is required' });
+        if (!content)   return void res.status(400).json({ error: 'BadRequest', message: 'content is required' });
+        const proj = await pool.query('SELECT id, team_id FROM projects WHERE id = $1 LIMIT 1', [projectId]);
+        if (!proj.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Project not found' });
+        const teamId = proj.rows[0].team_id as string;
+        const newId  = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : 'obs_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+        const result = await pool.query(
+          `INSERT INTO observations (id, project_id, team_id, kind, content, metadata)
+           VALUES ($1,$2,$3,$4,$5,$6::jsonb)
+           RETURNING id,project_id,team_id,server_session_id,kind,content,metadata,created_at,updated_at`,
+          [newId, projectId, teamId, kind, content, '{}']
+        );
+        const observation = result.rows[0];
+        // Broadcast to Admin UI
+        this.graph.eventBroadcaster.broadcast({ type: 'observation_created', observation });
+        // Broadcast to Viewer UI (mapping to Viewer's expected structure)
+        this.graph.eventBroadcaster.broadcast({ 
+          type: 'new_observation', 
+          observation: {
+            id: observation.id,
+            memory_session_id: observation.server_session_id || '',
+            project: observation.project_id,
+            type: observation.kind,
+            title: (observation.metadata as any)?.title || null,
+            subtitle: (observation.metadata as any)?.subtitle || null,
+            narrative: (observation.metadata as any)?.narrative || null,
+            facts: (observation.metadata as any)?.facts || null,
+            concepts: (observation.metadata as any)?.concepts || null,
+            files_read: (observation.metadata as any)?.files_read || null,
+            files_modified: (observation.metadata as any)?.files_modified || null,
+            created_at: observation.created_at.toISOString(),
+            created_at_epoch: observation.created_at.getTime(),
+            platform_source: 'api',
+            prompt_number: null,
+            text: observation.content
+          } 
+        });
+        res.status(201).json({ observation });
       } catch (err: unknown) {
         res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
       }
@@ -148,6 +347,7 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
         const id = String(req.params.id);
         const result = await pool.query('DELETE FROM observations WHERE id = $1 RETURNING id', [id]);
         if (!result.rows[0]) return void res.status(404).json({ error: 'NotFound', message: 'Observation not found' });
+        this.graph.eventBroadcaster.broadcast({ type: 'observation_deleted', id });
         res.json({ deleted: true, id });
       } catch (err: unknown) {
         res.status(500).json({ error: 'MemoryUiError', message: err instanceof Error ? err.message : String(err) });
@@ -279,11 +479,13 @@ export class ServerBetaService {
       queueManager: this.graph.queueManager,
       authMode: this.graph.authMode === 'disabled' ? 'api-key' : this.graph.authMode,
       runtime: SERVER_BETA_RUNTIME,
+      eventBroadcaster: this.graph.eventBroadcaster,
       // Session policy is read inside the routes (default 'per-event' from
       // resolveSessionGenerationPolicy(), env-overridable via
       // CLAUDE_MEM_SERVER_SESSION_POLICY). We do not duplicate it here.
     });
     server.registerRoutes(v1Routes);
+    server.registerRoutes(new PostgresViewerRoutes(this.graph));
 
     // Phase 9 — legacy compatibility adapters. These translate the old
     // `/api/sessions/observations` and `/api/sessions/summarize` worker

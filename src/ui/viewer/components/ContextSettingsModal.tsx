@@ -446,6 +446,24 @@ export function ContextSettingsModal({
                 </>
               )}
 
+              <CollapsibleSection
+                title="Server Security"
+                description="Authentication for the claude-mem server"
+                defaultOpen={true}
+              >
+                <FormField
+                  label="Server API Key"
+                  tooltip="The Bearer API key used by the UI and MCP tools to authenticate with this server."
+                >
+                  <input
+                    type="password"
+                    value={formState.CLAUDE_MEM_SERVER_BETA_API_KEY || ''}
+                    onChange={(e) => updateSetting('CLAUDE_MEM_SERVER_BETA_API_KEY', e.target.value)}
+                    placeholder="Enter Server API key..."
+                  />
+                </FormField>
+              </CollapsibleSection>
+
               <FormField
                 label="Worker Port"
                 tooltip="Port for the background worker service"

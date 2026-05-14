@@ -91,6 +91,7 @@ export interface Settings {
 
   CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY?: string;
   CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE?: string;
+  CLAUDE_MEM_SERVER_BETA_API_KEY?: string;
 }
 
 export interface WorkerStats {

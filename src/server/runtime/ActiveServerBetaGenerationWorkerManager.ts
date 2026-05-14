@@ -11,6 +11,7 @@ import type { ActiveServerBetaQueueManager } from './ActiveServerBetaQueueManage
 import type {
   ServerBetaBoundaryHealth,
   ServerBetaGenerationWorkerManager,
+  ServerBetaEventBroadcaster,
 } from './types.js';
 
 // ActiveServerBetaGenerationWorkerManager wires a BullMQ Worker (per the
@@ -27,6 +28,7 @@ export interface ActiveServerBetaGenerationWorkerManagerOptions {
   pool: PostgresPool;
   queueManager: ActiveServerBetaQueueManager;
   provider: ServerGenerationProvider;
+  eventBroadcaster?: ServerBetaEventBroadcaster;
   workerId?: string;
   // Test seam: replace the generator with a stub.
   generatorFactory?: (
@@ -50,6 +52,7 @@ export class ActiveServerBetaGenerationWorkerManager implements ServerBetaGenera
       : new ProviderObservationGenerator({
           pool: options.pool,
           provider: options.provider,
+          eventBroadcaster: options.eventBroadcaster,
           workerId: this.workerId,
         });
   }
