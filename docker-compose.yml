@@ -83,11 +83,11 @@ services:
       CLAUDE_MEM_RUNTIME: server-beta
       CLAUDE_MEM_HOST: 0.0.0.0
       CLAUDE_MEM_SERVER_HOST: 0.0.0.0
-      CLAUDE_MEM_SERVER_PORT: "37877"
+      CLAUDE_MEM_SERVER_PORT: "37954"
       # Legacy var some libraries still read; keep aligned with server port
       # so the existing E2E driver and viewer continue to work.
       CLAUDE_MEM_WORKER_HOST: 0.0.0.0
-      CLAUDE_MEM_WORKER_PORT: "37877"
+      CLAUDE_MEM_WORKER_PORT: "37954"
       CLAUDE_MEM_DATA_DIR: /data/claude-mem
       CLAUDE_MEM_QUEUE_ENGINE: bullmq
       CLAUDE_MEM_REDIS_URL: redis://valkey:6379
@@ -99,11 +99,11 @@ services:
       # does. This split keeps HTTP latency unaffected by provider calls.
       CLAUDE_MEM_GENERATION_DISABLED: "true"
     ports:
-      - "37877:37877"
+      - "37954:37954"
     volumes:
       - claude-mem-data:/data/claude-mem
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:37877/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:37954/healthz"]
       interval: 10s
       timeout: 3s
       retries: 12
