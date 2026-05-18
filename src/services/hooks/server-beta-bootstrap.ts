@@ -69,8 +69,8 @@ export async function bootstrapServerBetaApiKey(
     const repo = new PostgresAuthRepository(pool);
     const created = await repo.createApiKey({
       keyHash,
-      teamId,
-      projectId,
+      teamId: null,
+      projectId: null,
       actorId: LOCAL_HOOK_ACTOR_ID,
       scopes: [...HOOK_API_KEY_SCOPES],
     });

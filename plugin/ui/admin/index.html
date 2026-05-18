@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TCE-Memory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════ -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="8" fill="url(#lg)"/>
+      <path d="M8 14h12M14 8v12" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3b82f6"/>
+          <stop offset="1" stop-color="#8b5cf6"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <span class="sidebar-title">TCE-Memory</span>
+  </div>
+  <span class="sidebar-label">Gerenciamento</span>
+  <a href="#teams"    class="nav-item active" data-tab="teams">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Times
+  </a>
+  <a href="#projects" class="nav-item" data-tab="projects">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    Projetos
+  </a>
+  <a href="#memories" class="nav-item" data-tab="memories">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    Memórias
+  </a>
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-status" id="statusDot">
+    <span class="dot dot-green"></span>
+    <span class="status-text">server-beta</span>
+  </div>
+</nav>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════ -->
+<main class="main" id="main">
+
+  <!-- ── TOPBAR ───────────────────────────────────────────── -->
+  <header class="topbar">
+    <button class="icon-btn" id="menuToggle" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <h1 class="page-title" id="pageTitle">Times</h1>
+    <div class="topbar-end">
+      <span class="badge" id="globalCount">—</span>
+      <button class="btn btn-primary" id="globalAdd">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Novo
+      </button>
+    </div>
+  </header>
+
+  <!-- ── TEAMS TAB ─────────────────────────────────────────── -->
+  <section class="tab-pane active" id="tab-teams">
+    <div class="section-header">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="teamSearch" placeholder="Filtrar times...">
+      </div>
+      <button class="btn btn-ghost" id="refreshTeams">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar
+      </button>
+    </div>
+    <div class="card-grid" id="teamsList"></div>
+  </section>
+
+  <!-- ── PROJECTS TAB ──────────────────────────────────────── -->
+  <section class="tab-pane" id="tab-projects">
+    <div class="section-header">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="projectSearch" placeholder="Filtrar projetos...">
+      </div>
+      <div class="filter-row">
+        <select id="projectTeamFilter">
+          <option value="">Todos os times</option>
+        </select>
+        <button class="btn btn-ghost" id="refreshProjects">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Atualizar
+        </button>
+      </div>
+    </div>
+    <div class="card-grid" id="projectsList"></div>
+  </section>
+
+  <!-- ── MEMORIES TAB ──────────────────────────────────────── -->
+  <section class="tab-pane" id="tab-memories">
+    <div class="section-header">
+      <div class="search-box wide">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="memSearch" placeholder="Buscar conteúdo, projeto, ID...">
+        <button class="btn btn-primary btn-sm" id="memSearchBtn">Buscar</button>
+      </div>
+      <div class="filter-row">
+        <select id="memProjectFilter">
+          <option value="">Todos os projetos</option>
+        </select>
+        <select id="memLimit">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+        <button class="btn btn-ghost" id="refreshMems">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="mem-list" id="memList"></div>
+    <div class="pagination" id="memPagination"></div>
+  </section>
+
+</main>
+
+<!-- ══ MODALS ════════════════════════════════════════════════════════ -->
+
+<!-- Team modal -->
+<dialog class="modal" id="modalTeam">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTeamTitle">Novo Time</h2>
+      <button class="icon-btn" data-close="modalTeam">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nome do Time <span class="req">*</span></label>
+        <input type="text" id="teamNameInput" placeholder="ex: Backend Squad" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalTeam">Cancelar</button>
+      <button class="btn btn-primary" id="saveTeam">Salvar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Project modal -->
+<dialog class="modal" id="modalProject">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalProjectTitle">Novo Projeto</h2>
+      <button class="icon-btn" data-close="modalProject">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Nome do Projeto <span class="req">*</span></label>
+        <input type="text" id="projectNameInput" placeholder="ex: ms-esfinge-web" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Time <span class="req">*</span></label>
+        <select id="projectTeamSelect">
+          <option value="">— Selecione um time —</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalProject">Cancelar</button>
+      <button class="btn btn-primary" id="saveProject">Salvar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Memory modal -->
+<dialog class="modal" id="modalMemory">
+  <div class="modal-inner modal-inner--wide">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalMemoryTitle">Nova Memória</h2>
+      <button class="icon-btn" data-close="modalMemory">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field" id="memProjectField">
+        <label>Projeto <span class="req">*</span></label>
+        <select id="memProjectSelect">
+          <option value="">— Selecione um projeto —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Tipo (kind)</label>
+        <input type="text" id="memKindInput" placeholder="ex: manual, bugfix, decision..." value="manual" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Conteúdo <span class="req">*</span></label>
+        <textarea id="memContentInput" rows="8" placeholder="Descreva a memória aqui..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalMemory">Cancelar</button>
+      <button class="btn btn-primary" id="saveMemory">Salvar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Confirm dialog -->
+<dialog class="modal modal--sm" id="modalConfirm">
+  <div class="modal-inner">
+    <div class="modal-header">
+      <h2 class="modal-title">Confirmar exclusão</h2>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMessage" class="confirm-text">Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalConfirm">Cancelar</button>
+      <button class="btn btn-danger" id="confirmOk">Excluir</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Toast -->
+<div class="toast-stack" id="toastStack"></div>
+
+<script src="/admin/app.js"></script>
+</body>
+</html>

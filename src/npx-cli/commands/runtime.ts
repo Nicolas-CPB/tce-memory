@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import pc from 'picocolors';
 import { resolveBunBinaryPath } from '../utils/bun-resolver.js';
-import { isPluginInstalled, marketplaceDirectory } from '../utils/paths.js';
+import { isPluginInstalled, marketplaceDirectory, npmPackagePluginDirectory } from '../utils/paths.js';
 import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js';
 
 function ensureInstalledOrExit(): void {
@@ -243,6 +243,32 @@ export function runTranscriptWatchCommand(): void {
 
   child.on('error', (error) => {
     console.error(pc.red(`Failed to start transcript watcher: ${error.message}`));
+    process.exit(1);
+  });
+
+  child.on('close', (exitCode) => {
+    process.exit(exitCode ?? 0);
+  });
+}
+
+export function runMcpServerCommand(extraArgs: string[] = []): void {
+  let mcpScript = join(npmPackagePluginDirectory(), 'scripts', 'mcp-server.cjs');
+  if (!existsSync(mcpScript)) {
+    mcpScript = join(marketplaceDirectory(), 'plugin', 'scripts', 'mcp-server.cjs');
+    if (!existsSync(mcpScript)) {
+      console.error(pc.red(`MCP server script not found.`));
+      process.exit(1);
+    }
+  }
+
+  const nodePath = process.execPath;
+  const child = spawnHidden(nodePath, [mcpScript, ...extraArgs], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  child.on('error', (error) => {
+    console.error(pc.red(`Failed to start MCP server: ${error.message}`));
     process.exit(1);
   });
 

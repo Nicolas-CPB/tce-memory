@@ -62,8 +62,11 @@ class ServerBetaRuntimeInfoRoutes implements RouteHandler {
       resolve(_scriptDir, '..', '..', '..', 'src', 'ui', 'admin'),
       // Running from compiled bundle: plugin/scripts/ -> repo root -> src/ui/admin
       resolve(_scriptDir, '..', '..', 'src', 'ui', 'admin'),
+      // Running from compiled bundle: plugin/scripts/ -> plugin/ui/admin
+      resolve(_scriptDir, '..', 'ui', 'admin'),
       // Fallback: cwd-relative
       resolve(process.cwd(), 'src', 'ui', 'admin'),
+      resolve(process.cwd(), 'ui', 'admin'),
     ];
     const adminDir = _adminCandidates.find(p => existsSync(join(p, 'index.html'))) ?? _adminCandidates[0]!;
     app.use('/admin', express.static(adminDir));

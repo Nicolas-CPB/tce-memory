@@ -51,7 +51,8 @@ RUN chown -R node:node /opt/claude-mem
 
 USER node
 RUN cd /opt/claude-mem \
- && npm install --omit=dev --legacy-peer-deps --strict-ssl=false --registry=http://registry.npmjs.org/
+ && export npm_config_disturl=http://nodejs.org/dist \
+ && NODE_TLS_REJECT_UNAUTHORIZED=0 npm install --omit=dev --legacy-peer-deps --strict-ssl=false --registry=http://registry.npmjs.org/
 
 USER root
 RUN mkdir -p /home/node/.claude /home/node/.claude-mem /data/claude-mem \

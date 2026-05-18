@@ -64,11 +64,25 @@ async function buildViewer() {
       );
     }
 
+    const adminDir = path.join(srcUiDir, 'admin');
+    const outputAdminDir = path.join(outputUiDir, 'admin');
+    if (fs.existsSync(adminDir)) {
+      fs.mkdirSync(outputAdminDir, { recursive: true });
+      const adminFiles = fs.readdirSync(adminDir);
+      for (const file of adminFiles) {
+        fs.copyFileSync(
+          path.join(adminDir, file),
+          path.join(outputAdminDir, file)
+        );
+      }
+    }
+
     console.log('✓ React viewer built successfully');
     console.log('  - plugin/ui/viewer-bundle.js');
     console.log('  - plugin/ui/viewer.html (from viewer-template.html)');
     console.log('  - plugin/ui/assets/fonts/* (font files)');
     console.log(`  - plugin/ui/icon-thick-*.svg (${iconFiles.length} icon files)`);
+    console.log('  - plugin/ui/admin/* (admin UI files)');
   } catch (error) {
     console.error('Failed to build viewer:', error);
     process.exit(1);

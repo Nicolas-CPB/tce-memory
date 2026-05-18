@@ -23,30 +23,29 @@ Adicionamos configurações para ignorar validações de SSL e permitir compila�
     - `curl -k`
     - `npm config set strict-ssl false`
     - Variável `NODE_TLS_REJECT_UNAUTHORIZED=0`
+    - Variável `npm_config_disturl=http://nodejs.org/dist` para forçar o `node-gyp` a baixar dependências via HTTP.
 - **Registro NPM:** Uso temporário de `http://registry.npmjs.org/` para evitar travas de TLS.
 
 ## 3. Como Subir a Aplicação
 
-Caso os containers não subam via Docker devido a restrições de compilação, a solução mais estável é manter o **Banco e Redis no Docker** e rodar a **Aplicação no Host**.
+Com os ajustes aplicados no `Dockerfile`, agora é possível subir a aplicação integralmente via Docker, não dependendo mais da biblioteca local (`bun plugin/...`).
 
-### Passo 1: Garantir Infraestrutura (Docker)
-Certifique-se de que o Postgres e o Valkey estão rodando:
+### Subir Toda a Infraestrutura (Postgres, Valkey, Servidor e Worker)
 ```bash
-docker compose up -d postgres valkey
+docker compose up -d --build
 ```
 
-### Passo 2: Subir o Servidor (Host)
-Execute o servidor em modo daemon:
-```bash
-bun plugin/scripts/server-beta-service.cjs --daemon
-```
-*Acesse em: http://localhost:37954/admin/#projects*
+*Acesso:* Após rodar os containers, o painel fica disponível em: http://localhost:37954/admin/#projects
 
-### Passo 3: Subir o Worker (Host)
-Inicie o processador de observações:
-```bash
-bun plugin/scripts/server-beta-service.cjs worker start
-```
+### Alternativa: Subir Manualmente no Host (Caso o Docker Falhe)
+
+Caso precise rodar a aplicação localmente:
+1. Garanta que apenas o Postgres e o Valkey estão rodando:
+   `docker compose up -d postgres valkey`
+2. Execute o servidor em modo daemon:
+   `bun plugin/scripts/server-beta-service.cjs --daemon`
+3. Inicie o processador de observações (Worker):
+   `bun plugin/scripts/server-beta-service.cjs worker start`
 
 ## 4. Verificação de Saúde
 Sempre que tiver problemas de conexão, valide o endpoint de saúde:

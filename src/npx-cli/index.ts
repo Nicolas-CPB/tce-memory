@@ -193,6 +193,12 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'mcp': {
+      const { runMcpServerCommand } = await import('./commands/runtime.js');
+      runMcpServerCommand(args.slice(1));
+      break;
+    }
+
     default: {
       console.error(pc.red(`Unknown command: ${command}`));
       console.error(`Run ${pc.bold('npx claude-mem --help')} for usage information.`);

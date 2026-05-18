@@ -71,11 +71,77 @@ export function requirePostgresServerAuth(
         return;
       }
 
+      let teamId = verified.teamId;
+      let projectId = verified.projectId;
+
+      // If the API key is a global/default key (not bound to a team/project),
+      // we dynamically resolve the teamId and projectId based on the request's targets.
+      if (!teamId) {
+        // 1. Try to find projectId from body or query
+        let reqProjectId = req.body?.projectId || req.query?.projectId;
+        if (!reqProjectId && req.body && typeof req.body === 'object') {
+          if (Array.isArray(req.body) && req.body[0]?.projectId) {
+            reqProjectId = req.body[0].projectId;
+          }
+        }
+
+        // 2. Try to find teamId from query or body
+        let reqTeamId = req.body?.teamId || req.query?.teamId;
+
+        // 3. Try to extract session ID or job ID from URL path to resolve team/project
+        if (!reqProjectId && !reqTeamId) {
+          const sessionMatch = req.path.match(/^\/v1\/sessions\/([^\/]+)/);
+          if (sessionMatch) {
+            const sessionId = sessionMatch[1];
+            const sessionResult = await pool.query<{ project_id: string; team_id: string }>(
+              'SELECT project_id, team_id FROM server_sessions WHERE id = $1',
+              [sessionId],
+            );
+            if (sessionResult.rows[0]) {
+              projectId = sessionResult.rows[0].project_id;
+              teamId = sessionResult.rows[0].team_id;
+            }
+          } else {
+            const jobMatch = req.path.match(/^\/v1\/jobs\/([^\/]+)/);
+            if (jobMatch) {
+              const jobId = jobMatch[1];
+              const jobResult = await pool.query<{ project_id: string; team_id: string }>(
+                'SELECT project_id, team_id FROM observation_generation_jobs WHERE id = $1',
+                [jobId],
+              );
+              if (jobResult.rows[0]) {
+                projectId = jobResult.rows[0].project_id;
+                teamId = jobResult.rows[0].team_id;
+              }
+            }
+          }
+        } else if (reqProjectId && typeof reqProjectId === 'string') {
+          projectId = reqProjectId;
+          const projectResult = await pool.query<{ team_id: string }>(
+            'SELECT team_id FROM projects WHERE id = $1',
+            [reqProjectId],
+          );
+          if (projectResult.rows[0]) {
+            teamId = projectResult.rows[0].team_id;
+          }
+        } else if (reqTeamId && typeof reqTeamId === 'string') {
+          teamId = reqTeamId;
+        }
+
+        // 4. Fallback if still no teamId resolved: use the first team in the database
+        if (!teamId) {
+          const firstTeamResult = await pool.query<{ id: string }>('SELECT id FROM teams LIMIT 1');
+          if (firstTeamResult.rows[0]) {
+            teamId = firstTeamResult.rows[0].id;
+          }
+        }
+      }
+
       const ctx: AuthContext = {
         userId: null,
         organizationId: null,
-        teamId: verified.teamId,
-        projectId: verified.projectId,
+        teamId: teamId,
+        projectId: projectId,
         scopes: verified.scopes,
         apiKeyId: verified.apiKeyId,
         mode: 'api-key',
